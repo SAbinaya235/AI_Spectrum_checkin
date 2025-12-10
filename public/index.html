@@ -1,0 +1,91 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>Conference Check-in</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <style>
+    body{font-family:Arial, max-width:720px;margin:32px auto;padding:0 16px}
+    label{display:block;margin-top:10px;font-weight:600}
+    input{width:100%;padding:8px;margin-top:6px;border:1px solid #ccc;border-radius:6px}
+    input[readonly]{background:#fbfbfb}
+    button{margin-top:12px;padding:10px 14px;border:0;border-radius:8px;background:#4b7bec;color:white;cursor:pointer}
+    button[disabled]{opacity:0.6;cursor:not-allowed}
+    .msg{margin-top:12px}
+    .small{font-size:0.9rem;color:#555}
+  </style>
+</head>
+<body>
+  <h1>Conference Check-in</h1>
+
+  <label>Registration ID</label>
+  <input id="regId" placeholder="Enter or scan ID (e.g. REG001)" />
+
+  <button id="fetchBtn">Fetch Details</button>
+
+  <div id="formArea" style="display:none">
+    <label>Name</label><input id="name" readonly />
+    <label>Email</label><input id="email" readonly />
+    <label>Phone</label><input id="phone" readonly />
+    <label>Paper Title</label><input id="paper" readonly />
+    <label>College</label><input id="college" readonly />
+    <p id="already" class="small" style="color:#b91c1c;display:none">Already checked in</p>
+    <button id="confirmBtn">Confirm Details (Check-in)</button>
+  </div>
+
+  <p class="msg" id="msg"></p>
+
+  <script>
+    const apiRoot = '/api';
+    const fetchBtn = document.getElementById('fetchBtn');
+    const confirmBtn = document.getElementById('confirmBtn');
+    const formArea = document.getElementById('formArea');
+    const msg = document.getElementById('msg');
+
+    fetchBtn.onclick = async () => {
+      msg.textContent = '';
+      formArea.style.display = 'none';
+      const id = document.getElementById('regId').value.trim();
+      if (!id) { msg.textContent = 'Enter registration ID'; return; }
+      try {
+        const res = await fetch(`${apiRoot}/participants/${encodeURIComponent(id)}`);
+        if (!res.ok) {
+          const j = await res.json().catch(()=>({message:'Error'}));
+          throw new Error(j.message || 'Participant not found');
+        }
+        const p = await res.json();
+        document.getElementById('name').value = p.name || '';
+        document.getElementById('email').value = p.email || '';
+        document.getElementById('phone').value = p.phone || '';
+        document.getElementById('paper').value = p.paper_title || '';
+        document.getElementById('college').value = p.college_name || '';
+        document.getElementById('already').style.display = p.scanned_successful ? 'block' : 'none';
+        formArea.style.display = 'block';
+      } catch (e) {
+        msg.textContent = e.message || 'Participant not found';
+      }
+    };
+
+    confirmBtn.onclick = async () => {
+      msg.textContent = '';
+      const id = document.getElementById('regId').value.trim();
+      try {
+        const res = await fetch(`${apiRoot}/participants/${encodeURIComponent(id)}/checkin`, { method: 'POST' });
+        const j = await res.json();
+        if (!res.ok) throw new Error(j.message || 'Error during check-in');
+        msg.textContent = j.message || 'Checked in';
+        document.getElementById('already').style.display = 'block';
+      } catch (e) {
+        msg.textContent = e.message || 'Error during check-in';
+      }
+    };
+
+    // Prefill id from ?id=REG001 (useful for QR per-user links)
+    const params = new URLSearchParams(location.search);
+    if (params.get('id')) {
+      document.getElementById('regId').value = params.get('id');
+      fetchBtn.click();
+    }
+  </script>
+</body>
+</html>
